@@ -75,6 +75,79 @@ export const BracketFork: React.FC<BracketForkProps> = ({
   );
 };
 
+/**
+ * Elbow connector for a single feeder card advancing into a downstream match.
+ * Used when a downstream slot is fed by exactly one visible card (the other
+ * side is a bye auto-advance or comes from another bracket section), and for
+ * 1-to-1 transitions where card positions differ between rounds (odd-team
+ * carry-forward). Falls back to a straight line when both ends align.
+ */
+export const ElbowConnector: React.FC<{
+  width?: number;
+  height: number;
+  fromY: number;
+  toY: number;
+  className?: string;
+  isActive?: boolean;
+}> = ({ width = 48, height, fromY, toY, className = '', isActive = false }) => {
+  const midX = width / 2;
+  const radius = 6;
+
+  // Straight-through fast path (single-card rounds aligned 1-to-1).
+  if (Math.abs(fromY - toY) < 0.5) {
+    return (
+      <svg
+        width={width}
+        height={height}
+        className={`shrink-0 overflow-visible pointer-events-none select-none ${className}`}
+        style={{ minWidth: width }}
+      >
+        <line
+          x1="0"
+          y1={toY}
+          x2={width}
+          y2={toY}
+          stroke="currentColor"
+          strokeWidth="2"
+          className={isActive ? 'text-emerald-500/80' : 'text-slate-300 dark:text-slate-700'}
+        />
+      </svg>
+    );
+  }
+
+  const goingDown = toY >= fromY;
+  // Horizontal out of the feeder card, vertical spine, horizontal into the target.
+  const outPath = goingDown
+    ? `M 0 ${fromY} H ${midX - radius} Q ${midX} ${fromY} ${midX} ${fromY + radius} V ${toY} H ${width}`
+    : `M 0 ${fromY} H ${midX - radius} Q ${midX} ${fromY} ${midX} ${fromY - radius} V ${toY} H ${width}`;
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      className={`shrink-0 overflow-visible pointer-events-none select-none ${className}`}
+      style={{ minWidth: width }}
+    >
+      <path
+        d={outPath}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        className="text-slate-300 dark:text-slate-700 transition-colors"
+      />
+      {isActive && (
+        <path
+          d={outPath}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="text-emerald-500/80 transition-colors"
+        />
+      )}
+    </svg>
+  );
+};
+
 interface StraightConnectorProps {
   width?: number;
   height: number;

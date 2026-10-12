@@ -3,7 +3,7 @@ import { Match, Tournament } from "../../types/tournament";
 import { MatchCard } from "./MatchCard";
 import { ChampionBanner } from "./ChampionBanner";
 import { BracketZoomControls } from "./BracketZoomControls";
-import { BracketFork } from "./BracketConnector";
+import { BracketFork, ElbowConnector } from "./BracketConnector";
 
 interface SingleEliminationBracketProps {
   tournament: Tournament;
@@ -50,11 +50,16 @@ export const SingleEliminationBracket: React.FC<
     );
   }
 
-  // Base slot height: match card is 128px high + 32px vertical gap = 160px
+  // Base slot height: match card is 128px high + 32px vertical gap = 160px.
+  // The tree must fit its LARGEST round (odd-team byes can make later
+  // rounds bigger than round 1), and each round spreads its cards evenly.
   const baseSlotHeight = 160;
   const connectorWidth = 56;
-  const round1MatchesCount = roundsMap.get(1)?.length || 8;
-  const totalTreeHeight = round1MatchesCount * baseSlotHeight;
+  const maxRoundCount = Math.max(
+    ...Array.from(roundsMap.values()).map((list) => list.length),
+    1,
+  );
+  const totalTreeHeight = Math.max(maxRoundCount * baseSlotHeight, 320);
 
   return (
     <div className="space-y-6">
@@ -129,11 +134,20 @@ export const SingleEliminationBracket: React.FC<
                 const roundMatches = roundsMap.get(roundNum) || [];
                 const isLastRound = roundIdx === sortedRoundNumbers.length - 1;
 
+                // Each round spreads its own cards evenly across the tree,
+                // so odd-team rounds (fewer or more cards than neighbours)
+                // stay aligned with their actual feeder links.
                 const currentSlotHeight =
-                  Math.pow(2, roundIdx) * baseSlotHeight;
+                  totalTreeHeight / Math.max(roundMatches.length, 1);
                 const nextRoundMatches = !isLastRound
-                  ? roundsMap.get(roundNum + 1) || []
+                  ? roundsMap.get(sortedRoundNumbers[roundIdx + 1]) || []
                   : [];
+                const nextSlotHeight =
+                  nextRoundMatches.length > 0
+                    ? totalTreeHeight / nextRoundMatches.length
+                    : currentSlotHeight;
+                const centerOf = (idx: number, slotH: number) =>
+                  idx * slotH + slotH / 2;
 
                 return (
                   <React.Fragment key={roundNum}>
@@ -158,7 +172,11 @@ export const SingleEliminationBracket: React.FC<
                       ))}
                     </div>
 
-                    {/* SVG Connector Column between this round and next round */}
+                    {/* SVG Connector Column between this round and next round.
+                        Links follow actual nextMatchId feeders (not positional
+                        pairs), so even-team pairings draw forks, odd-team
+                        carry-forwards draw single elbows, and one-card rounds
+                        draw a straight-through line instead of a broken fork. */}
                     {!isLastRound && (
                       <div
                         className="shrink-0"
@@ -172,37 +190,53 @@ export const SingleEliminationBracket: React.FC<
                           height={totalTreeHeight}
                           className="overflow-visible select-none"
                         >
-                          {Array.from({ length: nextRoundMatches.length }).map(
-                            (_, pairIdx) => {
-                              const pairSlotHeight = currentSlotHeight * 2;
-                              const topY =
-                                pairIdx * pairSlotHeight +
-                                currentSlotHeight / 2;
-                              const bottomY = topY + currentSlotHeight;
-                              const midY = (topY + bottomY) / 2;
-
-                              const topMatch = roundMatches[pairIdx * 2];
-                              const bottomMatch = roundMatches[pairIdx * 2 + 1];
-
-                              const hasWinnerTop = Boolean(topMatch?.winnerId);
-                              const hasWinnerBottom = Boolean(
-                                bottomMatch?.winnerId,
+                          {nextRoundMatches.map((nextMatch, nextIdx) => {
+                            const feeders = roundMatches
+                              .map((m, idx) => ({ m, idx }))
+                              .filter(
+                                ({ m }) => m.nextMatchId === nextMatch.id,
                               );
+                            const midY = centerOf(nextIdx, nextSlotHeight);
 
+                            if (feeders.length >= 2) {
+                              const top = feeders[0];
+                              const bottom = feeders[feeders.length - 1];
+                              const topY = centerOf(top.idx, currentSlotHeight);
+                              const bottomY = centerOf(
+                                bottom.idx,
+                                currentSlotHeight,
+                              );
                               return (
                                 <BracketFork
-                                  key={pairIdx}
+                                  key={nextMatch.id}
                                   width={connectorWidth}
                                   height={totalTreeHeight}
                                   topY={topY}
                                   bottomY={bottomY}
                                   midY={midY}
-                                  hasWinnerTop={hasWinnerTop}
-                                  hasWinnerBottom={hasWinnerBottom}
+                                  hasWinnerTop={Boolean(top.m.winnerId)}
+                                  hasWinnerBottom={Boolean(bottom.m.winnerId)}
                                 />
                               );
-                            },
-                          )}
+                            }
+                            if (feeders.length === 1) {
+                              const fromY = centerOf(
+                                feeders[0].idx,
+                                currentSlotHeight,
+                              );
+                              return (
+                                <ElbowConnector
+                                  key={nextMatch.id}
+                                  width={connectorWidth}
+                                  height={totalTreeHeight}
+                                  fromY={fromY}
+                                  toY={midY}
+                                  isActive={Boolean(feeders[0].m.winnerId)}
+                                />
+                              );
+                            }
+                            return null;
+                          })}
                         </svg>
                       </div>
                     )}

@@ -30,6 +30,12 @@ export function canGenerateBracket(tournament: Tournament): {
 
 /**
  * Generates matches for Single Elimination format.
+ * - Even team counts: no extra / BYE cards, direct pairings.
+ * - Odd team counts: leftover team auto-advances to the next round,
+ *   no extra BYE card is created.
+ * - A team never gets stuck waiting on an opponent that can never arrive:
+ *   every downstream slot is fed only by real matches or by carried
+ *   bye-teams, never by a phantom BYE loser.
  */
 export function generateSingleElimination(tournament: Tournament): Tournament {
   const teams = [...tournament.teams];
@@ -46,8 +52,11 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
   const matches: Match[] = [];
   let matchCounter = 1;
 
-  // Round 1 seed pairings
+  type Slot = { match: Match | null; byeTeamId: string | null };
+
+  // Round 1 seed pairings — only real pairings become cards.
   const seedPairs = getStandardSeedPairs(S);
+  const round1Slots: Slot[] = [];
   const round1Matches: Match[] = [];
 
   for (let i = 0; i < seedPairs.length; i++) {
@@ -55,80 +64,85 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
     const team1 = seedToTeam[s1] || null;
     const team2 = seedToTeam[s2] || null;
 
-    const matchId = `SE-R1-M${i + 1}`;
-    const roundName = getRoundName("single", 1, totalRounds);
-
-    let status: MatchStatus = "pending";
-    let winnerId: string | null = null;
-    let loserId: string | null = null;
-    let team1Score: number | null = null;
-    let team2Score: number | null = null;
-
-    // Check for bye: if one team is missing, the existing team gets an automatic bye
-    if (team1 && !team2) {
-      status = "bye";
-      winnerId = team1.id;
-      team1Score = null;
-      team2Score = null;
-    } else if (!team1 && team2) {
-      status = "bye";
-      winnerId = team2.id;
-      team1Score = null;
-      team2Score = null;
-    } else if (team1 && team2) {
-      status = "ready";
+    if (team1 && team2) {
+      const matchId = `SE-R1-M${round1Matches.length + 1}`;
+      const roundName = getRoundName("single", 1, totalRounds);
+      const match: Match = {
+        id: matchId,
+        matchNumber: matchCounter++,
+        tournamentId: tournament.id,
+        bracketType: "single",
+        roundNumber: 1,
+        roundName,
+        team1Id: team1.id,
+        team2Id: team2.id,
+        team1Placeholder: `Seed #${s1}`,
+        team2Placeholder: `Seed #${s2}`,
+        team1Score: null,
+        team2Score: null,
+        winnerId: null,
+        loserId: null,
+        status: "ready",
+        nextMatchId: null,
+        nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
+      };
+      round1Matches.push(match);
+      matches.push(match);
+      round1Slots.push({ match, byeTeamId: null });
+    } else if (team1 || team2) {
+      // Odd-team out (or even-team bye slot): auto-advance, no card.
+      const byeTeam = (team1 || team2)!;
+      round1Slots.push({ match: null, byeTeamId: byeTeam.id });
+    } else {
+      round1Slots.push({ match: null, byeTeamId: null });
     }
-
-    const match: Match = {
-      id: matchId,
-      matchNumber: matchCounter++,
-      tournamentId: tournament.id,
-      bracketType: "single",
-      roundNumber: 1,
-      roundName,
-      team1Id: team1 ? team1.id : null,
-      team2Id: team2 ? team2.id : null,
-      team1Placeholder: `Seed #${s1}`,
-      team2Placeholder: s2 <= N ? `Seed #${s2}` : "BYE",
-      team1Score,
-      team2Score,
-      winnerId,
-      loserId,
-      status,
-      nextMatchId: null, // will link below
-      nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
-      completedAt: status === "bye" ? new Date().toISOString() : undefined,
-    };
-
-    round1Matches.push(match);
-    matches.push(match);
   }
 
-  // Generate Rounds 2 to Final
-  let previousRoundMatches = round1Matches;
+  // Generate Rounds 2 to Final from slots (real winners + carried byes).
+  let previousSlots = round1Slots;
 
   for (let r = 2; r <= totalRounds; r++) {
-    const currentRoundMatches: Match[] = [];
     const numMatches = S / Math.pow(2, r);
     const roundName = getRoundName("single", r, totalRounds);
+    const currentMatches: Match[] = [];
+    const currentSlots: Slot[] = [];
 
     for (let i = 0; i < numMatches; i++) {
-      const matchId = `SE-R${r}-M${i + 1}`;
-      const prevM1 = previousRoundMatches[i * 2];
-      const prevM2 = previousRoundMatches[i * 2 + 1];
+      const f1 = previousSlots[i * 2];
+      const f2 = previousSlots[i * 2 + 1];
+      if (!f1 && !f2) {
+        currentSlots.push({ match: null, byeTeamId: null });
+        continue;
+      }
+      const feeder1 = f1 || { match: null, byeTeamId: null };
+      const feeder2 = f2 || { match: null, byeTeamId: null };
 
-      // Assign nextMatchId to previous round matches
-      prevM1.nextMatchId = matchId;
-      prevM1.nextMatchSlot = "team1";
-      prevM2.nextMatchId = matchId;
-      prevM2.nextMatchSlot = "team2";
+      const t1Id =
+        feeder1.match?.winnerId ?? feeder1.byeTeamId ?? null;
+      const t2Id =
+        feeder2.match?.winnerId ?? feeder2.byeTeamId ?? null;
+      const t1Bye = !feeder1.match && Boolean(feeder1.byeTeamId);
+      const t2Bye = !feeder2.match && Boolean(feeder2.byeTeamId);
 
-      // Check if previous matches already have winners (from Byes)
-      const t1Id = prevM1.winnerId;
-      const t2Id = prevM2.winnerId;
-      // Teams arriving straight from a BYE are marked so the UI can label them.
-      const t1Bye = prevM1.status === "bye" && Boolean(t1Id);
-      const t2Bye = prevM2.status === "bye" && Boolean(t2Id);
+      // Skip only slots that can NEVER produce a team (both feeders empty).
+      // A feeder with a real (unplayed) match is viable: its winner arrives later.
+      const f1Viable = Boolean(feeder1.match) || Boolean(feeder1.byeTeamId);
+      const f2Viable = Boolean(feeder2.match) || Boolean(feeder2.byeTeamId);
+      if (!f1Viable && !f2Viable) {
+        currentSlots.push({ match: null, byeTeamId: null });
+        continue;
+      }
+
+      const matchId = `SE-R${r}-M${currentMatches.length + 1}`;
+
+      if (feeder1.match) {
+        feeder1.match.nextMatchId = matchId;
+        feeder1.match.nextMatchSlot = "team1";
+      }
+      if (feeder2.match) {
+        feeder2.match.nextMatchId = matchId;
+        feeder2.match.nextMatchSlot = "team2";
+      }
 
       let status: MatchStatus = "pending";
       if (t1Id && t2Id) {
@@ -157,11 +171,12 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
         nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
       };
 
-      currentRoundMatches.push(match);
+      currentMatches.push(match);
       matches.push(match);
+      currentSlots.push({ match, byeTeamId: null });
     }
 
-    previousRoundMatches = currentRoundMatches;
+    previousSlots = currentSlots;
   }
 
   return {
@@ -177,8 +192,8 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
 
 /**
  * Generates complete Double Elimination format:
- * - Winners Bracket
- * - Losers Bracket
+ * - Winners Bracket (no BYE cards; byes auto-advance, no new card)
+ * - Losers Bracket (built only from real losers, no dead TBD slots)
  * - Single Grand Final (one match decides the champion)
  */
 export function generateDoubleElimination(tournament: Tournament): Tournament {
@@ -186,7 +201,7 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
   const N = teams.length;
   const S = getNextPowerOfTwo(N, 4);
   const W = Math.log2(S); // Total WB rounds
-  const totalLbRounds = 2 * (W - 1); // 6 for 16 teams
+  const totalLbRounds = 2 * (W - 1);
 
   const seedToTeam: Record<number, Team> = {};
   teams.forEach((t) => {
@@ -196,89 +211,91 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
   const matches: Match[] = [];
   let matchCounter = 1;
 
-  // 1. GENERATE WINNERS BRACKET (WB)
+  type WbSlot = { match: Match | null; byeTeamId: string | null };
+
+  // 1. WINNERS BRACKET — no BYE cards.
   const wbMatchesByRound: Record<number, Match[]> = {};
   const seedPairs = getStandardSeedPairs(S);
   wbMatchesByRound[1] = [];
+  const wbR1Slots: WbSlot[] = [];
 
   for (let i = 0; i < seedPairs.length; i++) {
     const [s1, s2] = seedPairs[i];
     const team1 = seedToTeam[s1] || null;
     const team2 = seedToTeam[s2] || null;
 
-    const matchId = `WB-R1-M${i + 1}`;
-    const roundName = getRoundName("winners", 1, W);
-
-    let status: MatchStatus = "pending";
-    let winnerId: string | null = null;
-    let team1Score: number | null = null;
-    let team2Score: number | null = null;
-
-    if (team1 && !team2) {
-      status = "bye";
-      winnerId = team1.id;
-      team1Score = null;
-      team2Score = null;
-    } else if (!team1 && team2) {
-      status = "bye";
-      winnerId = team2.id;
-      team1Score = null;
-      team2Score = null;
-    } else if (team1 && team2) {
-      status = "ready";
+    if (team1 && team2) {
+      const matchId = `WB-R1-M${wbMatchesByRound[1].length + 1}`;
+      const roundName = getRoundName("winners", 1, W);
+      const match: Match = {
+        id: matchId,
+        matchNumber: matchCounter++,
+        tournamentId: tournament.id,
+        bracketType: "winners",
+        roundNumber: 1,
+        roundName,
+        team1Id: team1.id,
+        team2Id: team2.id,
+        team1Placeholder: `Seed #${s1}`,
+        team2Placeholder: `Seed #${s2}`,
+        team1Score: null,
+        team2Score: null,
+        winnerId: null,
+        loserId: null,
+        status: "ready",
+        nextMatchId: null,
+        nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
+      };
+      wbMatchesByRound[1].push(match);
+      matches.push(match);
+      wbR1Slots.push({ match, byeTeamId: null });
+    } else if (team1 || team2) {
+      // Odd team out: auto-advance to WB-R2, no new card.
+      const byeTeam = (team1 || team2)!;
+      wbR1Slots.push({ match: null, byeTeamId: byeTeam.id });
+    } else {
+      wbR1Slots.push({ match: null, byeTeamId: null });
     }
-
-    const match: Match = {
-      id: matchId,
-      matchNumber: matchCounter++,
-      tournamentId: tournament.id,
-      bracketType: "winners",
-      roundNumber: 1,
-      roundName,
-      team1Id: team1 ? team1.id : null,
-      team2Id: team2 ? team2.id : null,
-      team1Placeholder: `Seed #${s1}`,
-      team2Placeholder: s2 <= N ? `Seed #${s2}` : "BYE",
-      team1Score,
-      team2Score,
-      winnerId,
-      loserId: null,
-      status,
-      nextMatchId: null,
-      nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
-      completedAt: status === "bye" ? new Date().toISOString() : undefined,
-    };
-
-    wbMatchesByRound[1].push(match);
-    matches.push(match);
   }
 
-  // WB Rounds 2 to W
+  // WB Rounds 2..W from slots (real winners + carried bye teams).
+  let prevWbSlots: WbSlot[] = wbR1Slots;
   for (let r = 2; r <= W; r++) {
     wbMatchesByRound[r] = [];
     const numMatches = S / Math.pow(2, r);
     const roundName = getRoundName("winners", r, W);
+    const curSlots: WbSlot[] = [];
 
     for (let i = 0; i < numMatches; i++) {
-      const matchId = `WB-R${r}-M${i + 1}`;
-      const prevM1 = wbMatchesByRound[r - 1][i * 2];
-      const prevM2 = wbMatchesByRound[r - 1][i * 2 + 1];
+      const f1 = prevWbSlots[i * 2] || { match: null, byeTeamId: null };
+      const f2 = prevWbSlots[i * 2 + 1] || { match: null, byeTeamId: null };
 
-      prevM1.nextMatchId = matchId;
-      prevM1.nextMatchSlot = "team1";
-      prevM2.nextMatchId = matchId;
-      prevM2.nextMatchSlot = "team2";
+      const t1Id = f1.match?.winnerId ?? f1.byeTeamId ?? null;
+      const t2Id = f2.match?.winnerId ?? f2.byeTeamId ?? null;
+      const t1Bye = !f1.match && Boolean(f1.byeTeamId);
+      const t2Bye = !f2.match && Boolean(f2.byeTeamId);
 
-      const t1Id = prevM1.winnerId;
-      const t2Id = prevM2.winnerId;
-      // Teams arriving straight from a BYE are marked so the UI can label them.
-      const t1Bye = prevM1.status === "bye" && Boolean(t1Id);
-      const t2Bye = prevM2.status === "bye" && Boolean(t2Id);
+      // Skip only slots that can NEVER produce a team. Unplayed real
+      // matches are viable feeders — their winners arrive via recordMatchResult.
+      const f1Viable = Boolean(f1.match) || Boolean(f1.byeTeamId);
+      const f2Viable = Boolean(f2.match) || Boolean(f2.byeTeamId);
+      if (!f1Viable && !f2Viable) {
+        curSlots.push({ match: null, byeTeamId: null });
+        continue;
+      }
+
+      const matchId = `WB-R${r}-M${wbMatchesByRound[r].length + 1}`;
+      if (f1.match) {
+        f1.match.nextMatchId = matchId;
+        f1.match.nextMatchSlot = "team1";
+      }
+      if (f2.match) {
+        f2.match.nextMatchId = matchId;
+        f2.match.nextMatchSlot = "team2";
+      }
 
       let status: MatchStatus = "pending";
-      if (t1Id && t2Id) {
-        status = "ready";
-      }
+      if (t1Id && t2Id) status = "ready";
 
       const match: Match = {
         id: matchId,
@@ -301,37 +318,44 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
         nextMatchId: null,
         nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
       };
-
       wbMatchesByRound[r].push(match);
       matches.push(match);
+      curSlots.push({ match, byeTeamId: null });
     }
+    prevWbSlots = curSlots;
   }
 
-  // 2. GENERATE LOSERS BRACKET (LB)
+  // 2. LOSERS BRACKET — only from real losers, never a dead TBD slot.
+  // Every LB card created here has two genuine feeders (LB winner and/or
+  // WB loser), so no team waits forever on an opponent that cannot arrive.
+  type LbFeeder =
+    | { kind: "wbLoser"; match: Match }
+    | { kind: "lbWinner"; match: Match };
+
   const lbMatchesByRound: Record<number, Match[]> = {};
+  const wbR1Real = wbMatchesByRound[1] || [];
 
-  // LB Round 1: takes losers from WB Round 1
-  // WB R1 has S/2 matches -> LB R1 has S/4 matches
-  lbMatchesByRound[1] = [];
-  const lbR1Count = S / 4;
-  for (let i = 0; i < lbR1Count; i++) {
-    const matchId = `LB-R1-M${i + 1}`;
-    const wbLossM1 = wbMatchesByRound[1][i * 2];
-    const wbLossM2 = wbMatchesByRound[1][i * 2 + 1];
+  const linkWbLoser = (wb: Match, lb: Match, slot: "team1" | "team2") => {
+    wb.loserNextMatchId = lb.id;
+    wb.loserNextMatchSlot = slot;
+  };
+  const linkLbWinner = (prev: Match, lb: Match, slot: "team1" | "team2") => {
+    prev.nextMatchId = lb.id;
+    prev.nextMatchSlot = slot;
+  };
+  const linkFeederToSlot = (feeder: LbFeeder, lb: Match, slot: "team1" | "team2") => {
+    if (feeder.kind === "wbLoser") linkWbLoser(feeder.match, lb, slot);
+    else linkLbWinner(feeder.match, lb, slot);
+  };
 
-    wbLossM1.loserNextMatchId = matchId;
-    wbLossM1.loserNextMatchSlot = "team1";
-    wbLossM2.loserNextMatchId = matchId;
-    wbLossM2.loserNextMatchSlot = "team2";
-
-    // If WB R1 was a bye, there is no loser
-    const match: Match = {
-      id: matchId,
+  const makeLbMatch = (roundNum: number, seq: number): Match => {
+    const m: Match = {
+      id: `LB-R${roundNum}-M${seq}`,
       matchNumber: matchCounter++,
       tournamentId: tournament.id,
       bracketType: "losers",
-      roundNumber: 1,
-      roundName: getRoundName("losers", 1, totalLbRounds),
+      roundNumber: roundNum,
+      roundName: getRoundName("losers", roundNum, totalLbRounds),
       team1Id: null,
       team2Id: null,
       team1Placeholder: `Waiting`,
@@ -344,111 +368,151 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
       nextMatchId: null,
       nextMatchSlot: "team1",
     };
+    matches.push(m);
+    if (!lbMatchesByRound[roundNum]) lbMatchesByRound[roundNum] = [];
+    lbMatchesByRound[roundNum].push(m);
+    return m;
+  };
 
-    lbMatchesByRound[1].push(match);
-    matches.push(match);
+  // LB-R1: pair real WB-R1 losers sequentially. Odd leftover carries forward
+  // as an auto-advance (no new card for it).
+  let carryPool: LbFeeder[] = [];
+  if (wbR1Real.length >= 2) {
+    const pairs = Math.floor(wbR1Real.length / 2);
+    for (let i = 0; i < pairs; i++) {
+      const lb = makeLbMatch(1, i + 1);
+      linkWbLoser(wbR1Real[i * 2], lb, "team1");
+      linkWbLoser(wbR1Real[i * 2 + 1], lb, "team2");
+    }
+    const created = lbMatchesByRound[1] || [];
+    carryPool = created.map((m) => ({ kind: "lbWinner", match: m }) as LbFeeder);
+    if (wbR1Real.length % 2 === 1) {
+      carryPool.push({
+        kind: "wbLoser",
+        match: wbR1Real[wbR1Real.length - 1],
+      });
+    }
+  } else if (wbR1Real.length === 1) {
+    carryPool = [{ kind: "wbLoser", match: wbR1Real[0] }];
   }
+  let carryWbExcess: Match[] = [];
 
-  // LB Rounds 2 through totalLbRounds:
-  // Alternating between "Major" (drop from WB) and "Minor" (LB winners vs each other)
-  // Total LB rounds: 2*(W-1)
-  // For each WB round w from 2 to W:
-  //   LB round (2*w - 2): Takes LB winner vs WB Rw loser. Count = S / 2^w.
-  //   If w < W:
-  //     LB round (2*w - 1): Takes winners of previous LB round playing each other. Count = S / 2^(w+1).
   for (let w = 2; w <= W; w++) {
-    const lbDropRoundNum = 2 * w - 2;
-    const dropMatchesCount = S / Math.pow(2, w);
-    lbMatchesByRound[lbDropRoundNum] = [];
-
-    // Drop round: LB winner plays loser dropping from WB Rw
-    for (let i = 0; i < dropMatchesCount; i++) {
-      const matchId = `LB-R${lbDropRoundNum}-M${i + 1}`;
-      const prevLbMatch = lbMatchesByRound[lbDropRoundNum - 1][i];
-      const wbDropMatch = wbMatchesByRound[w][i];
-
-      prevLbMatch.nextMatchId = matchId;
-      prevLbMatch.nextMatchSlot = "team1";
-
-      wbDropMatch.loserNextMatchId = matchId;
-      wbDropMatch.loserNextMatchSlot = "team2";
-
-      const match: Match = {
-        id: matchId,
-        matchNumber: matchCounter++,
-        tournamentId: tournament.id,
-        bracketType: "losers",
-        roundNumber: lbDropRoundNum,
-        roundName: getRoundName("losers", lbDropRoundNum, totalLbRounds),
-        team1Id: null,
-        team2Id: null,
-        team1Placeholder: `Waiting`,
-        team2Placeholder: `Waiting`,
-        team1Score: null,
-        team2Score: null,
-        winnerId: null,
-        loserId: null,
-        status: "pending",
-        nextMatchId: null,
-        nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
-      };
-
-      lbMatchesByRound[lbDropRoundNum].push(match);
-      matches.push(match);
+    const lbDropNum = 2 * w - 2;
+    const wbList = wbMatchesByRound[w] || [];
+    const wbAvail: Match[] = [...carryWbExcess, ...wbList];
+    const dropCount = Math.min(carryPool.length, wbAvail.length);
+    const dropMatches: Match[] = [];
+    for (let i = 0; i < dropCount; i++) {
+      const lb = makeLbMatch(lbDropNum, i + 1);
+      linkFeederToSlot(carryPool[i], lb, "team1");
+      linkWbLoser(wbAvail[i], lb, "team2");
+      // Alternate outgoing slot to keep connector geometry stable.
+      lb.nextMatchSlot = i % 2 === 0 ? "team1" : "team2";
+      dropMatches.push(lb);
     }
+    const usedPool = carryPool.slice(0, dropCount);
+    void usedPool;
+    carryPool = carryPool.slice(dropCount);
+    carryWbExcess = wbAvail.slice(dropCount);
 
-    // Next round: LB winners play each other (only if not at LB Final)
     if (w < W) {
-      const lbIntRoundNum = 2 * w - 1;
-      const intMatchesCount = dropMatchesCount / 2;
-      lbMatchesByRound[lbIntRoundNum] = [];
-
-      for (let i = 0; i < intMatchesCount; i++) {
-        const matchId = `LB-R${lbIntRoundNum}-M${i + 1}`;
-        const prevM1 = lbMatchesByRound[lbDropRoundNum][i * 2];
-        const prevM2 = lbMatchesByRound[lbDropRoundNum][i * 2 + 1];
-
-        prevM1.nextMatchId = matchId;
-        prevM1.nextMatchSlot = "team1";
-        prevM2.nextMatchId = matchId;
-        prevM2.nextMatchSlot = "team2";
-
-        const match: Match = {
-          id: matchId,
-          matchNumber: matchCounter++,
-          tournamentId: tournament.id,
-          bracketType: "losers",
-          roundNumber: lbIntRoundNum,
-          roundName: getRoundName("losers", lbIntRoundNum, totalLbRounds),
-          team1Id: null,
-          team2Id: null,
-          team1Placeholder: `Waiting`,
-          team2Placeholder: `Waiting`,
-          team1Score: null,
-          team2Score: null,
-          winnerId: null,
-          loserId: null,
-          status: "pending",
-          nextMatchId: null,
-          nextMatchSlot: "team1",
-        };
-
-        lbMatchesByRound[lbIntRoundNum].push(match);
-        matches.push(match);
+      // Intermediate round: drop winners (+ carried pool) play each other.
+      const lbIntNum = 2 * w - 1;
+      const intFeeders: LbFeeder[] = [
+        ...dropMatches.map(
+          (m) => ({ kind: "lbWinner", match: m }) as LbFeeder,
+        ),
+        ...carryPool,
+      ];
+      carryPool = [];
+      const intCount = Math.floor(intFeeders.length / 2);
+      for (let i = 0; i < intCount; i++) {
+        const lb = makeLbMatch(lbIntNum, i + 1);
+        linkFeederToSlot(intFeeders[i * 2], lb, "team1");
+        linkFeederToSlot(intFeeders[i * 2 + 1], lb, "team2");
+        lb.nextMatchSlot = "team1";
       }
+      const createdInt = lbMatchesByRound[lbIntNum] || [];
+      const nextPool: LbFeeder[] = createdInt.map(
+        (m) => ({ kind: "lbWinner", match: m }) as LbFeeder,
+      );
+      if (intFeeders.length % 2 === 1) {
+        nextPool.push(intFeeders[intFeeders.length - 1]);
+      }
+      carryPool = nextPool;
+    } else {
+      // Final WB round: drop winners feed the LB final resolution below.
+      carryPool = [
+        ...dropMatches.map(
+          (m) => ({ kind: "lbWinner", match: m }) as LbFeeder,
+        ),
+        ...carryPool,
+      ];
     }
   }
 
-  // 3. GRAND FINAL
-  const wbFinalMatch = wbMatchesByRound[W][0];
-  const lbFinalMatch = lbMatchesByRound[totalLbRounds][0];
+  // Resolve any leftovers to a single LB champion (no dead 1-team cards:
+  // leftovers play each other, odd one carries forward).
+  let playoffRound =
+    Math.max(0, ...Object.keys(lbMatchesByRound).map(Number)) + 1;
+  if (playoffRound < 1) playoffRound = totalLbRounds;
+  let finalPool: LbFeeder[] = [...carryPool];
+  // carryWbExcess holds WB matches whose losers never got an LB slot.
+  for (const wb of carryWbExcess) {
+    finalPool.push({ kind: "wbLoser", match: wb });
+  }
+  while (finalPool.length > 1) {
+    const roundNum = playoffRound <= totalLbRounds ? playoffRound : playoffRound;
+    const count = Math.floor(finalPool.length / 2);
+    const created: Match[] = [];
+    for (let i = 0; i < count; i++) {
+      const lb = makeLbMatch(roundNum, i + 1);
+      linkFeederToSlot(finalPool[i * 2], lb, "team1");
+      linkFeederToSlot(finalPool[i * 2 + 1], lb, "team2");
+      lb.nextMatchSlot = "team1";
+      created.push(lb);
+    }
+    const next: LbFeeder[] = created.map(
+      (m) => ({ kind: "lbWinner", match: m }) as LbFeeder,
+    );
+    if (finalPool.length % 2 === 1) {
+      next.push(finalPool[finalPool.length - 1]);
+    }
+    finalPool = next;
+    playoffRound += 1;
+  }
+
+  // 3. GRAND FINAL — WB champion vs LB champion (or carried WB loser if
+  // the LB collapsed to a single carried feeder, e.g. 2-team tourney).
+  const wbFinalMatch = wbMatchesByRound[W]?.[0];
+  const lbRoundNums = Object.keys(lbMatchesByRound)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const lastLbRound = lbRoundNums.length
+    ? lbMatchesByRound[lbRoundNums[lbRoundNums.length - 1]]
+    : [];
+  const lbFinalMatch = lastLbRound.length === 1 ? lastLbRound[0] : null;
 
   const grandFinalId = "GF-M1";
-  wbFinalMatch.nextMatchId = grandFinalId;
-  wbFinalMatch.nextMatchSlot = "team1";
-
-  lbFinalMatch.nextMatchId = grandFinalId;
-  lbFinalMatch.nextMatchSlot = "team2";
+  if (wbFinalMatch) {
+    wbFinalMatch.nextMatchId = grandFinalId;
+    wbFinalMatch.nextMatchSlot = "team1";
+  }
+  if (lbFinalMatch) {
+    lbFinalMatch.nextMatchId = grandFinalId;
+    lbFinalMatch.nextMatchSlot = "team2";
+  } else if (finalPool.length === 1) {
+    // No LB final card (tiny bracket): route the lone survivor to the final.
+    const lone = finalPool[0];
+    if (lone.kind === "wbLoser") {
+      lone.match.loserNextMatchId = grandFinalId;
+      lone.match.loserNextMatchSlot = "team2";
+    } else {
+      lone.match.nextMatchId = grandFinalId;
+      lone.match.nextMatchSlot = "team2";
+    }
+  }
 
   const grandFinalMatch: Match = {
     id: grandFinalId,
@@ -574,6 +638,10 @@ export function recordMatchResult(
     }
   }
 
+  const wasCompleted = match.status === "completed";
+  const oldWinnerId = match.winnerId;
+  const oldLoserId = match.loserId;
+
   match.team1Score = team1Score;
   match.team2Score = team2Score;
   match.winnerId = winnerId;
@@ -583,6 +651,84 @@ export function recordMatchResult(
 
   const updatedMatches = [...tournament.matches];
   updatedMatches[matchIndex] = match;
+
+  // If editing a completed match with a changed winner, the old winner/loser
+  // may already sit in downstream cards (including Lower Bracket) with played
+  // results built on them. Clear those stale downstream slots/results first so
+  // the Lower Bracket is recalculated instead of corrupted.
+  if (wasCompleted && (oldWinnerId !== winnerId || oldLoserId !== loserId)) {
+    const byId = new Map(updatedMatches.map((m) => [m.id, m]));
+    // Operate on the live objects inside updatedMatches via the map.
+    for (let i = 0; i < updatedMatches.length; i++) {
+      byId.set(updatedMatches[i].id, updatedMatches[i]);
+    }
+    interface ClearTask {
+      matchId: string;
+      slot: "team1" | "team2";
+      expectedTeamId: string;
+      isLoserPath: boolean;
+    }
+    const queue: ClearTask[] = [];
+    // Only clear paths whose team actually changed.
+    if (oldWinnerId && oldWinnerId !== winnerId && match.nextMatchId && match.nextMatchSlot) {
+      queue.push({
+        matchId: match.nextMatchId,
+        slot: match.nextMatchSlot,
+        expectedTeamId: oldWinnerId,
+        isLoserPath: false,
+      });
+    }
+    if (oldLoserId && oldLoserId !== loserId && match.loserNextMatchId && match.loserNextMatchSlot) {
+      queue.push({
+        matchId: match.loserNextMatchId,
+        slot: match.loserNextMatchSlot,
+        expectedTeamId: oldLoserId,
+        isLoserPath: true,
+      });
+    }
+    while (queue.length > 0) {
+      const task = queue.shift()!;
+      const idx = updatedMatches.findIndex((m) => m.id === task.matchId);
+      if (idx === -1) continue;
+      const m = { ...updatedMatches[idx] };
+      const current = task.slot === "team1" ? m.team1Id : m.team2Id;
+      if (current !== task.expectedTeamId) continue;
+      if (task.slot === "team1") {
+        m.team1Id = null;
+        m.team1Placeholder = "Waiting";
+        m.team1ByeAdvance = undefined;
+      } else {
+        m.team2Id = null;
+        m.team2Placeholder = "Waiting";
+        m.team2ByeAdvance = undefined;
+      }
+      const downstreamWinner = m.winnerId;
+      const downstreamLoser = m.loserId;
+      m.team1Score = null;
+      m.team2Score = null;
+      m.winnerId = null;
+      m.loserId = null;
+      m.completedAt = undefined;
+      m.status = "pending";
+      updatedMatches[idx] = m;
+      if (m.nextMatchId && m.nextMatchSlot && downstreamWinner) {
+        queue.push({
+          matchId: m.nextMatchId,
+          slot: m.nextMatchSlot,
+          expectedTeamId: downstreamWinner,
+          isLoserPath: false,
+        });
+      }
+      if (m.loserNextMatchId && m.loserNextMatchSlot && downstreamLoser) {
+        queue.push({
+          matchId: m.loserNextMatchId,
+          slot: m.loserNextMatchSlot,
+          expectedTeamId: downstreamLoser,
+          isLoserPath: true,
+        });
+      }
+    }
+  }
 
   let championId = tournament.championTeamId;
   let runnerUpId = tournament.runnerUpTeamId;
