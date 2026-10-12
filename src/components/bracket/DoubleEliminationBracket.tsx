@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Match, Tournament } from '../../types/tournament';
-import { MatchCard } from './MatchCard';
-import { ChampionBanner } from './ChampionBanner';
-import { BracketZoomControls } from './BracketZoomControls';
-import { BracketFork, StraightConnector } from './BracketConnector';
-import { getNextPowerOfTwo } from '../../services/seedGenerator';
+import React, { useState } from "react";
+import { Match, Tournament } from "../../types/tournament";
+import { MatchCard } from "./MatchCard";
+import { ChampionBanner } from "./ChampionBanner";
+import { BracketZoomControls } from "./BracketZoomControls";
+import { BracketFork, StraightConnector } from "./BracketConnector";
+import { getNextPowerOfTwo } from "../../services/seedGenerator";
 
 interface DoubleEliminationBracketProps {
   tournament: Tournament;
@@ -12,20 +12,23 @@ interface DoubleEliminationBracketProps {
   onResetMatch: (matchId: string) => void;
 }
 
-export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> = ({
-  tournament,
-  onOpenScore,
-  onResetMatch,
-}) => {
+export const DoubleEliminationBracket: React.FC<
+  DoubleEliminationBracketProps
+> = ({ tournament, onOpenScore, onResetMatch }) => {
   const [zoom, setZoom] = useState(1);
 
-  const wbMatches = tournament.matches.filter(m => m.bracketType === 'winners');
-  const lbMatches = tournament.matches.filter(m => m.bracketType === 'losers');
-  const gfMatch1 = tournament.matches.find(m => m.bracketType === 'grand_final') || null;
+  const wbMatches = tournament.matches.filter(
+    (m) => m.bracketType === "winners",
+  );
+  const lbMatches = tournament.matches.filter(
+    (m) => m.bracketType === "losers",
+  );
+  const gfMatch1 =
+    tournament.matches.find((m) => m.bracketType === "grand_final") || null;
 
   // Group WB matches
   const wbRounds = new Map<number, Match[]>();
-  wbMatches.forEach(m => {
+  wbMatches.forEach((m) => {
     const list = wbRounds.get(m.roundNumber) || [];
     list.push(m);
     wbRounds.set(m.roundNumber, list);
@@ -34,7 +37,7 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
 
   // Group LB matches
   const lbRounds = new Map<number, Match[]>();
-  lbMatches.forEach(m => {
+  lbMatches.forEach((m) => {
     const list = lbRounds.get(m.roundNumber) || [];
     list.push(m);
     lbRounds.set(m.roundNumber, list);
@@ -42,11 +45,11 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
   const sortedLbRounds = Array.from(lbRounds.keys()).sort((a, b) => a - b);
 
   const championTeam = tournament.championTeamId
-    ? tournament.teams.find(t => t.id === tournament.championTeamId) || null
+    ? tournament.teams.find((t) => t.id === tournament.championTeamId) || null
     : null;
 
   const runnerUpTeam = tournament.runnerUpTeamId
-    ? tournament.teams.find(t => t.id === tournament.runnerUpTeamId) || null
+    ? tournament.teams.find((t) => t.id === tournament.runnerUpTeamId) || null
     : null;
 
   // Geometry calculations
@@ -126,24 +129,21 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
             <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
               Double Elimination Board
             </span>
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200 dark:border-blue-900/40">
-                Upper: {wbMatches.length} Matches
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold border border-amber-200 dark:border-amber-900/40">
-                Lower: {lbMatches.length} Matches
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-200 dark:border-emerald-900/40">
-                Grand Final
-              </span>
-            </div>
+            <span className="text-xs text-slate-400 font-mono">
+              · {tournament.matches.length} Matches · {sortedWbRounds.length}{" "}
+              Rounds
+            </span>
           </div>
 
           {/* Zoom Controls */}
           <BracketZoomControls
             zoom={zoom}
-            onZoomIn={() => setZoom(prev => Math.min(1.5, Number((prev + 0.1).toFixed(2))))}
-            onZoomOut={() => setZoom(prev => Math.max(0.5, Number((prev - 0.1).toFixed(2))))}
+            onZoomIn={() =>
+              setZoom((prev) => Math.min(1.5, Number((prev + 0.1).toFixed(2))))
+            }
+            onZoomOut={() =>
+              setZoom((prev) => Math.max(0.5, Number((prev - 0.1).toFixed(2))))
+            }
             onResetZoom={() => setZoom(1)}
           />
         </div>
@@ -153,10 +153,10 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
           <div
             style={{
               transform: `scale(${zoom})`,
-              transformOrigin: 'top left',
+              transformOrigin: "top left",
               width: totalBoardWidth,
               height: totalBoardHeight,
-              position: 'relative',
+              position: "relative",
             }}
             className="transition-transform duration-100 ease-out select-none"
           >
@@ -165,7 +165,9 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
             {/* ========================================================================= */}
             <div
               className="absolute left-0 top-0"
-              style={{ width: (sortedWbRounds.length - 1) * colStep + cardWidth }}
+              style={{
+                width: (sortedWbRounds.length - 1) * colStep + cardWidth,
+              }}
             >
               {/* Upper Bracket Section Label - Just Transparent Text */}
               <div className="h-8 flex items-center mb-4 select-none">
@@ -180,8 +182,11 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
                   const roundMatches = wbRounds.get(roundNum) || [];
                   const isLastRound = roundIdx === sortedWbRounds.length - 1;
 
-                  const currentSlotHeight = Math.pow(2, roundIdx) * baseSlotHeight;
-                  const nextRoundMatches = !isLastRound ? wbRounds.get(roundNum + 1) || [] : [];
+                  const currentSlotHeight =
+                    Math.pow(2, roundIdx) * baseSlotHeight;
+                  const nextRoundMatches = !isLastRound
+                    ? wbRounds.get(roundNum + 1) || []
+                    : [];
 
                   return (
                     <React.Fragment key={roundNum}>
@@ -190,7 +195,7 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
                         className="flex flex-col w-64 shrink-0"
                         style={{ height: wbTotalHeight }}
                       >
-                        {roundMatches.map(match => (
+                        {roundMatches.map((match) => (
                           <div
                             key={match.id}
                             className="flex items-center justify-center"
@@ -210,16 +215,23 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
                       {!isLastRound && (
                         <div
                           className="shrink-0"
-                          style={{ width: connectorWidth, height: wbTotalHeight }}
+                          style={{
+                            width: connectorWidth,
+                            height: wbTotalHeight,
+                          }}
                         >
                           <svg
                             width={connectorWidth}
                             height={wbTotalHeight}
                             className="overflow-visible select-none"
                           >
-                            {Array.from({ length: nextRoundMatches.length }).map((_, pairIdx) => {
+                            {Array.from({
+                              length: nextRoundMatches.length,
+                            }).map((_, pairIdx) => {
                               const pairSlotHeight = currentSlotHeight * 2;
-                              const topY = pairIdx * pairSlotHeight + currentSlotHeight / 2;
+                              const topY =
+                                pairIdx * pairSlotHeight +
+                                currentSlotHeight / 2;
                               const bottomY = topY + currentSlotHeight;
                               const midY = (topY + bottomY) / 2;
 
@@ -227,7 +239,9 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
                               const bottomMatch = roundMatches[pairIdx * 2 + 1];
 
                               const hasWinnerTop = Boolean(topMatch?.winnerId);
-                              const hasWinnerBottom = Boolean(bottomMatch?.winnerId);
+                              const hasWinnerBottom = Boolean(
+                                bottomMatch?.winnerId,
+                              );
 
                               return (
                                 <BracketFork
@@ -273,12 +287,17 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
                 {sortedLbRounds.map((roundNum, roundIdx) => {
                   const roundMatches = lbRounds.get(roundNum) || [];
                   const isLastRound = roundIdx === sortedLbRounds.length - 1;
-                  const nextRoundMatches = !isLastRound ? lbRounds.get(roundNum + 1) || [] : [];
+                  const nextRoundMatches = !isLastRound
+                    ? lbRounds.get(roundNum + 1) || []
+                    : [];
 
                   const currentMatchesCount = roundMatches.length;
                   const nextMatchesCount = nextRoundMatches.length;
                   const currentSlotHeight = lbTotalHeight / currentMatchesCount;
-                  const nextSlotHeight = nextMatchesCount > 0 ? lbTotalHeight / nextMatchesCount : currentSlotHeight;
+                  const nextSlotHeight =
+                    nextMatchesCount > 0
+                      ? lbTotalHeight / nextMatchesCount
+                      : currentSlotHeight;
 
                   const isConvergence = currentMatchesCount > nextMatchesCount;
 
@@ -289,7 +308,7 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
                         className="flex flex-col w-64 shrink-0"
                         style={{ height: lbTotalHeight }}
                       >
-                        {roundMatches.map(match => (
+                        {roundMatches.map((match) => (
                           <div
                             key={match.id}
                             className="flex items-center justify-center"
@@ -309,51 +328,64 @@ export const DoubleEliminationBracket: React.FC<DoubleEliminationBracketProps> =
                       {!isLastRound && (
                         <div
                           className="shrink-0"
-                          style={{ width: connectorWidth, height: lbTotalHeight }}
+                          style={{
+                            width: connectorWidth,
+                            height: lbTotalHeight,
+                          }}
                         >
                           <svg
                             width={connectorWidth}
                             height={lbTotalHeight}
                             className="overflow-visible select-none"
                           >
-                            {isConvergence ? (
-                              // 2-to-1 convergence fork
-                              Array.from({ length: nextMatchesCount }).map((_, pairIdx) => {
-                                const topY = (pairIdx * 2) * currentSlotHeight + currentSlotHeight / 2;
-                                const bottomY = (pairIdx * 2 + 1) * currentSlotHeight + currentSlotHeight / 2;
-                                const midY = pairIdx * nextSlotHeight + nextSlotHeight / 2;
+                            {isConvergence
+                              ? // 2-to-1 convergence fork
+                                Array.from({ length: nextMatchesCount }).map(
+                                  (_, pairIdx) => {
+                                    const topY =
+                                      pairIdx * 2 * currentSlotHeight +
+                                      currentSlotHeight / 2;
+                                    const bottomY =
+                                      (pairIdx * 2 + 1) * currentSlotHeight +
+                                      currentSlotHeight / 2;
+                                    const midY =
+                                      pairIdx * nextSlotHeight +
+                                      nextSlotHeight / 2;
 
-                                const topM = roundMatches[pairIdx * 2];
-                                const botM = roundMatches[pairIdx * 2 + 1];
+                                    const topM = roundMatches[pairIdx * 2];
+                                    const botM = roundMatches[pairIdx * 2 + 1];
 
-                                return (
-                                  <BracketFork
-                                    key={pairIdx}
-                                    width={connectorWidth}
-                                    height={lbTotalHeight}
-                                    topY={topY}
-                                    bottomY={bottomY}
-                                    midY={midY}
-                                    hasWinnerTop={Boolean(topM?.winnerId)}
-                                    hasWinnerBottom={Boolean(botM?.winnerId)}
-                                  />
-                                );
-                              })
-                            ) : (
-                              // 1-to-1 transition straight horizontal line
-                              roundMatches.map((m, idx) => {
-                                const y = idx * currentSlotHeight + currentSlotHeight / 2;
-                                return (
-                                  <StraightConnector
-                                    key={idx}
-                                    width={connectorWidth}
-                                    height={lbTotalHeight}
-                                    y={y}
-                                    isCompleted={Boolean(m.winnerId)}
-                                  />
-                                );
-                              })
-                            )}
+                                    return (
+                                      <BracketFork
+                                        key={pairIdx}
+                                        width={connectorWidth}
+                                        height={lbTotalHeight}
+                                        topY={topY}
+                                        bottomY={bottomY}
+                                        midY={midY}
+                                        hasWinnerTop={Boolean(topM?.winnerId)}
+                                        hasWinnerBottom={Boolean(
+                                          botM?.winnerId,
+                                        )}
+                                      />
+                                    );
+                                  },
+                                )
+                              : // 1-to-1 transition straight horizontal line
+                                roundMatches.map((m, idx) => {
+                                  const y =
+                                    idx * currentSlotHeight +
+                                    currentSlotHeight / 2;
+                                  return (
+                                    <StraightConnector
+                                      key={idx}
+                                      width={connectorWidth}
+                                      height={lbTotalHeight}
+                                      y={y}
+                                      isCompleted={Boolean(m.winnerId)}
+                                    />
+                                  );
+                                })}
                           </svg>
                         </div>
                       )}

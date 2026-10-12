@@ -1,6 +1,6 @@
-import React from 'react';
-import { Trophy, Award, Sparkles } from 'lucide-react';
-import { Team, Tournament } from '../../types/tournament';
+import React from "react";
+import { Trophy, Award, Sparkles } from "lucide-react";
+import { Team, Tournament } from "../../types/tournament";
 
 interface ChampionBannerProps {
   tournament: Tournament;
@@ -25,14 +25,13 @@ export const ChampionBanner: React.FC<ChampionBannerProps> = ({
 
           <div>
             <div className="flex items-center justify-center md:justify-start gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              <Sparkles className="w-3.5 h-3.5" />
               <span>Tournament Champion</span>
             </div>
             <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5">
               {champion.name}
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-              Seed #{champion.seed} · Crowned champion in {tournament.name} ({tournament.gameOrSport})
+              Crown winner in {tournament.name} ({tournament.gameOrSport})
             </p>
           </div>
         </div>
@@ -45,7 +44,7 @@ export const ChampionBanner: React.FC<ChampionBannerProps> = ({
                 Runner-Up
               </span>
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                {runnerUp.name} (Seed #{runnerUp.seed})
+                {runnerUp.name}
               </span>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Trophy,
   Users,
@@ -12,13 +12,16 @@ import {
   Settings,
   ArrowRight,
   Download,
-} from 'lucide-react';
-import { Tournament, TournamentStatus } from '../../types/tournament';
-import { exportTournamentJSON } from '../../services/importExport';
+} from "lucide-react";
+import { Tournament, TournamentStatus } from "../../types/tournament";
+import { exportTournamentJSON } from "../../services/importExport";
 
 interface DashboardViewProps {
   tournaments: Tournament[];
-  onSelectTournament: (id: string, tab?: 'bracket' | 'teams' | 'matches') => void;
+  onSelectTournament: (
+    id: string,
+    tab?: "bracket" | "teams" | "matches",
+  ) => void;
   onOpenCreate: () => void;
   onOpenSettings: (tournament: Tournament) => void;
   onDeleteTournament: (id: string) => void;
@@ -31,8 +34,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSettings,
   onDeleteTournament,
 }) => {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | TournamentStatus>('all');
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | TournamentStatus>(
+    "all",
+  );
 
   // Aggregated KPIs
   const totalTournaments = tournaments.length;
@@ -40,15 +45,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   let totalOngoingMatches = 0;
   let totalCompletedMatches = 0;
-  tournaments.forEach(t => {
-    t.matches.forEach(m => {
-      if (m.status === 'ready' || m.status === 'ongoing') totalOngoingMatches++;
-      if (m.status === 'completed') totalCompletedMatches++;
+  tournaments.forEach((t) => {
+    t.matches.forEach((m) => {
+      if (m.status === "ready" || m.status === "ongoing") totalOngoingMatches++;
+      if (m.status === "completed") totalCompletedMatches++;
     });
   });
 
-  const filteredTournaments = tournaments.filter(t => {
-    if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+  const filteredTournaments = tournaments.filter((t) => {
+    if (statusFilter !== "all" && t.status !== statusFilter) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
       return (
@@ -69,9 +74,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
               Tournament Dashboard
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Private Tournament Directorate · Local Storage Management
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -89,46 +91,62 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Total Tournaments</span>
+              <span className="text-xs font-semibold text-slate-500">
+                Total Tournaments
+              </span>
               <Trophy className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-2">
               {totalTournaments}
             </div>
-            <span className="text-[11px] text-slate-400 mt-0.5 block">Stored locally</span>
+            <span className="text-[11px] text-slate-400 mt-0.5 block">
+              Stored locally
+            </span>
           </div>
 
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Registered Teams</span>
+              <span className="text-xs font-semibold text-slate-500">
+                Registered Teams
+              </span>
               <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-2">
               {totalTeams}
             </div>
-            <span className="text-[11px] text-slate-400 mt-0.5 block">Across all rosters</span>
+            <span className="text-[11px] text-slate-400 mt-0.5 block">
+              Across all rosters
+            </span>
           </div>
 
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Ready / Ongoing</span>
+              <span className="text-xs font-semibold text-slate-500">
+                Ready / Ongoing
+              </span>
               <PlayCircle className="w-4 h-4 text-amber-500" />
             </div>
             <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-2">
               {totalOngoingMatches}
             </div>
-            <span className="text-[11px] text-slate-400 mt-0.5 block">Pending outcome</span>
+            <span className="text-[11px] text-slate-400 mt-0.5 block">
+              Pending outcome
+            </span>
           </div>
 
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Completed Matches</span>
+              <span className="text-xs font-semibold text-slate-500">
+                Completed Matches
+              </span>
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             </div>
             <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-white mt-2">
               {totalCompletedMatches}
             </div>
-            <span className="text-[11px] text-slate-400 mt-0.5 block">Decided results</span>
+            <span className="text-[11px] text-slate-400 mt-0.5 block">
+              Decided results
+            </span>
           </div>
         </div>
       </div>
@@ -141,7 +159,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tournaments or sports..."
               className="w-full pl-9 pr-3.5 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             />
@@ -150,41 +168,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Status Filter */}
           <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1">
             <button
-              onClick={() => setStatusFilter('all')}
+              onClick={() => setStatusFilter("all")}
               className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
-                statusFilter === 'all'
-                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                statusFilter === "all"
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               }`}
             >
               All
             </button>
             <button
-              onClick={() => setStatusFilter('upcoming')}
+              onClick={() => setStatusFilter("upcoming")}
               className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
-                statusFilter === 'upcoming'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                statusFilter === "upcoming"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               }`}
             >
               Upcoming
             </button>
             <button
-              onClick={() => setStatusFilter('ongoing')}
+              onClick={() => setStatusFilter("ongoing")}
               className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
-                statusFilter === 'ongoing'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                statusFilter === "ongoing"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               }`}
             >
               Ongoing
             </button>
             <button
-              onClick={() => setStatusFilter('completed')}
+              onClick={() => setStatusFilter("completed")}
               className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
-                statusFilter === 'completed'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                statusFilter === "completed"
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               }`}
             >
               Completed
@@ -200,8 +218,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               {search
-                ? 'Try tweaking your search keywords or status filter'
-                : 'Create your first tournament bracket to get started.'}
+                ? "Try tweaking your search keywords or status filter"
+                : "Create your first tournament bracket to get started."}
             </p>
             {!search && (
               <button
@@ -214,9 +232,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTournaments.map(tournament => {
+            {filteredTournaments.map((tournament) => {
               const champion = tournament.championTeamId
-                ? tournament.teams.find(t => t.id === tournament.championTeamId)
+                ? tournament.teams.find(
+                    (t) => t.id === tournament.championTeamId,
+                  )
                 : null;
 
               return (
@@ -253,9 +273,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span>{tournament.teams.length} Teams</span>
                       <span>·</span>
                       <span>
-                        {tournament.settings.format === 'double_elimination'
-                          ? 'Double Elim'
-                          : 'Single Elim'}
+                        {tournament.settings.format === "double_elimination"
+                          ? "Double Elim"
+                          : "Single Elim"}
                       </span>
                       {tournament.tournamentDate && (
                         <>
@@ -304,13 +324,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => onSelectTournament(tournament.id, 'teams')}
+                        onClick={() =>
+                          onSelectTournament(tournament.id, "teams")
+                        }
                         className="px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
                       >
                         Teams
                       </button>
                       <button
-                        onClick={() => onSelectTournament(tournament.id, 'bracket')}
+                        onClick={() =>
+                          onSelectTournament(tournament.id, "bracket")
+                        }
                         className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-xs"
                       >
                         <span>Bracket</span>

@@ -107,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Trophy className="w-4 h-4" />
               </div>
               <span className="text-sm font-bold tracking-tight text-slate-900 dark:text-white truncate">
-                ApexBracket
+                SPCBracket
               </span>
             </button>
           </div>
@@ -137,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Trophy className="w-4 h-4" />
                 </div>
                 <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  ApexBracket
+                  SPCBracket
                 </span>
               </div>
               <button
@@ -185,14 +185,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={() => onSelectTab("dashboard")}
             className="flex items-center gap-2.5 text-left group min-w-0"
-            title={collapsed ? "ApexBracket — Dashboard" : undefined}
+            title={collapsed ? "SPCBracket — Dashboard" : undefined}
           >
             <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/20 group-hover:bg-blue-500 transition-colors shrink-0">
               <Trophy className="w-5 h-5" />
             </div>
             {!collapsed && (
               <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
-                ApexBracket
+                SPCBracket
               </span>
             )}
           </button>

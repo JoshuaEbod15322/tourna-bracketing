@@ -1,11 +1,18 @@
-import { Match, MatchStatus, Team, Tournament } from '../types/tournament';
-import { getNextPowerOfTwo, getRoundName, getStandardSeedPairs } from './seedGenerator';
+import { Match, MatchStatus, Team, Tournament } from "../types/tournament";
+import {
+  getNextPowerOfTwo,
+  getRoundName,
+  getStandardSeedPairs,
+} from "./seedGenerator";
 
 /**
  * Validates whether tournament is eligible to generate bracket.
  * Requires at least 2 teams, up to 16 teams maximum.
  */
-export function canGenerateBracket(tournament: Tournament): { canGenerate: boolean; reason?: string } {
+export function canGenerateBracket(tournament: Tournament): {
+  canGenerate: boolean;
+  reason?: string;
+} {
   if (tournament.teams.length < 2) {
     return {
       canGenerate: false,
@@ -32,7 +39,7 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
 
   // Map seed to team
   const seedToTeam: Record<number, Team> = {};
-  teams.forEach(t => {
+  teams.forEach((t) => {
     seedToTeam[t.seed] = t;
   });
 
@@ -49,9 +56,9 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
     const team2 = seedToTeam[s2] || null;
 
     const matchId = `SE-R1-M${i + 1}`;
-    const roundName = getRoundName('single', 1, totalRounds);
+    const roundName = getRoundName("single", 1, totalRounds);
 
-    let status: MatchStatus = 'pending';
+    let status: MatchStatus = "pending";
     let winnerId: string | null = null;
     let loserId: string | null = null;
     let team1Score: number | null = null;
@@ -59,38 +66,38 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
 
     // Check for bye: if one team is missing, the existing team gets an automatic bye
     if (team1 && !team2) {
-      status = 'bye';
+      status = "bye";
       winnerId = team1.id;
       team1Score = null;
       team2Score = null;
     } else if (!team1 && team2) {
-      status = 'bye';
+      status = "bye";
       winnerId = team2.id;
       team1Score = null;
       team2Score = null;
     } else if (team1 && team2) {
-      status = 'ready';
+      status = "ready";
     }
 
     const match: Match = {
       id: matchId,
       matchNumber: matchCounter++,
       tournamentId: tournament.id,
-      bracketType: 'single',
+      bracketType: "single",
       roundNumber: 1,
       roundName,
       team1Id: team1 ? team1.id : null,
       team2Id: team2 ? team2.id : null,
       team1Placeholder: `Seed #${s1}`,
-      team2Placeholder: s2 <= N ? `Seed #${s2}` : 'BYE',
+      team2Placeholder: s2 <= N ? `Seed #${s2}` : "BYE",
       team1Score,
       team2Score,
       winnerId,
       loserId,
       status,
       nextMatchId: null, // will link below
-      nextMatchSlot: i % 2 === 0 ? 'team1' : 'team2',
-      completedAt: status === 'bye' ? new Date().toISOString() : undefined,
+      nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
+      completedAt: status === "bye" ? new Date().toISOString() : undefined,
     };
 
     round1Matches.push(match);
@@ -103,7 +110,7 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
   for (let r = 2; r <= totalRounds; r++) {
     const currentRoundMatches: Match[] = [];
     const numMatches = S / Math.pow(2, r);
-    const roundName = getRoundName('single', r, totalRounds);
+    const roundName = getRoundName("single", r, totalRounds);
 
     for (let i = 0; i < numMatches; i++) {
       const matchId = `SE-R${r}-M${i + 1}`;
@@ -112,42 +119,42 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
 
       // Assign nextMatchId to previous round matches
       prevM1.nextMatchId = matchId;
-      prevM1.nextMatchSlot = 'team1';
+      prevM1.nextMatchSlot = "team1";
       prevM2.nextMatchId = matchId;
-      prevM2.nextMatchSlot = 'team2';
+      prevM2.nextMatchSlot = "team2";
 
       // Check if previous matches already have winners (from Byes)
       const t1Id = prevM1.winnerId;
       const t2Id = prevM2.winnerId;
       // Teams arriving straight from a BYE are marked so the UI can label them.
-      const t1Bye = prevM1.status === 'bye' && Boolean(t1Id);
-      const t2Bye = prevM2.status === 'bye' && Boolean(t2Id);
+      const t1Bye = prevM1.status === "bye" && Boolean(t1Id);
+      const t2Bye = prevM2.status === "bye" && Boolean(t2Id);
 
-      let status: MatchStatus = 'pending';
+      let status: MatchStatus = "pending";
       if (t1Id && t2Id) {
-        status = 'ready';
+        status = "ready";
       }
 
       const match: Match = {
         id: matchId,
         matchNumber: matchCounter++,
         tournamentId: tournament.id,
-        bracketType: 'single',
+        bracketType: "single",
         roundNumber: r,
         roundName,
         team1Id: t1Id,
         team2Id: t2Id,
         team1ByeAdvance: t1Bye || undefined,
         team2ByeAdvance: t2Bye || undefined,
-        team1Placeholder: `Winner of M#${prevM1.matchNumber}`,
-        team2Placeholder: `Winner of M#${prevM2.matchNumber}`,
+        team1Placeholder: `Waiting`,
+        team2Placeholder: `Waiting`,
         team1Score: null,
         team2Score: null,
         winnerId: null,
         loserId: null,
         status,
         nextMatchId: null,
-        nextMatchSlot: i % 2 === 0 ? 'team1' : 'team2',
+        nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
       };
 
       currentRoundMatches.push(match);
@@ -161,7 +168,7 @@ export function generateSingleElimination(tournament: Tournament): Tournament {
     ...tournament,
     matches,
     bracketGenerated: true,
-    status: 'ongoing',
+    status: "ongoing",
     championTeamId: null,
     runnerUpTeamId: null,
     updatedAt: new Date().toISOString(),
@@ -182,7 +189,7 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
   const totalLbRounds = 2 * (W - 1); // 6 for 16 teams
 
   const seedToTeam: Record<number, Team> = {};
-  teams.forEach(t => {
+  teams.forEach((t) => {
     seedToTeam[t.seed] = t;
   });
 
@@ -200,46 +207,46 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
     const team2 = seedToTeam[s2] || null;
 
     const matchId = `WB-R1-M${i + 1}`;
-    const roundName = getRoundName('winners', 1, W);
+    const roundName = getRoundName("winners", 1, W);
 
-    let status: MatchStatus = 'pending';
+    let status: MatchStatus = "pending";
     let winnerId: string | null = null;
     let team1Score: number | null = null;
     let team2Score: number | null = null;
 
     if (team1 && !team2) {
-      status = 'bye';
+      status = "bye";
       winnerId = team1.id;
       team1Score = null;
       team2Score = null;
     } else if (!team1 && team2) {
-      status = 'bye';
+      status = "bye";
       winnerId = team2.id;
       team1Score = null;
       team2Score = null;
     } else if (team1 && team2) {
-      status = 'ready';
+      status = "ready";
     }
 
     const match: Match = {
       id: matchId,
       matchNumber: matchCounter++,
       tournamentId: tournament.id,
-      bracketType: 'winners',
+      bracketType: "winners",
       roundNumber: 1,
       roundName,
       team1Id: team1 ? team1.id : null,
       team2Id: team2 ? team2.id : null,
       team1Placeholder: `Seed #${s1}`,
-      team2Placeholder: s2 <= N ? `Seed #${s2}` : 'BYE',
+      team2Placeholder: s2 <= N ? `Seed #${s2}` : "BYE",
       team1Score,
       team2Score,
       winnerId,
       loserId: null,
       status,
       nextMatchId: null,
-      nextMatchSlot: i % 2 === 0 ? 'team1' : 'team2',
-      completedAt: status === 'bye' ? new Date().toISOString() : undefined,
+      nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
+      completedAt: status === "bye" ? new Date().toISOString() : undefined,
     };
 
     wbMatchesByRound[1].push(match);
@@ -250,7 +257,7 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
   for (let r = 2; r <= W; r++) {
     wbMatchesByRound[r] = [];
     const numMatches = S / Math.pow(2, r);
-    const roundName = getRoundName('winners', r, W);
+    const roundName = getRoundName("winners", r, W);
 
     for (let i = 0; i < numMatches; i++) {
       const matchId = `WB-R${r}-M${i + 1}`;
@@ -258,41 +265,41 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
       const prevM2 = wbMatchesByRound[r - 1][i * 2 + 1];
 
       prevM1.nextMatchId = matchId;
-      prevM1.nextMatchSlot = 'team1';
+      prevM1.nextMatchSlot = "team1";
       prevM2.nextMatchId = matchId;
-      prevM2.nextMatchSlot = 'team2';
+      prevM2.nextMatchSlot = "team2";
 
       const t1Id = prevM1.winnerId;
       const t2Id = prevM2.winnerId;
       // Teams arriving straight from a BYE are marked so the UI can label them.
-      const t1Bye = prevM1.status === 'bye' && Boolean(t1Id);
-      const t2Bye = prevM2.status === 'bye' && Boolean(t2Id);
+      const t1Bye = prevM1.status === "bye" && Boolean(t1Id);
+      const t2Bye = prevM2.status === "bye" && Boolean(t2Id);
 
-      let status: MatchStatus = 'pending';
+      let status: MatchStatus = "pending";
       if (t1Id && t2Id) {
-        status = 'ready';
+        status = "ready";
       }
 
       const match: Match = {
         id: matchId,
         matchNumber: matchCounter++,
         tournamentId: tournament.id,
-        bracketType: 'winners',
+        bracketType: "winners",
         roundNumber: r,
         roundName,
         team1Id: t1Id,
         team2Id: t2Id,
         team1ByeAdvance: t1Bye || undefined,
         team2ByeAdvance: t2Bye || undefined,
-        team1Placeholder: `Winner of M#${prevM1.matchNumber}`,
-        team2Placeholder: `Winner of M#${prevM2.matchNumber}`,
+        team1Placeholder: `Waiting`,
+        team2Placeholder: `Waiting`,
         team1Score: null,
         team2Score: null,
         winnerId: null,
         loserId: null,
         status,
         nextMatchId: null,
-        nextMatchSlot: i % 2 === 0 ? 'team1' : 'team2',
+        nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
       };
 
       wbMatchesByRound[r].push(match);
@@ -313,29 +320,29 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
     const wbLossM2 = wbMatchesByRound[1][i * 2 + 1];
 
     wbLossM1.loserNextMatchId = matchId;
-    wbLossM1.loserNextMatchSlot = 'team1';
+    wbLossM1.loserNextMatchSlot = "team1";
     wbLossM2.loserNextMatchId = matchId;
-    wbLossM2.loserNextMatchSlot = 'team2';
+    wbLossM2.loserNextMatchSlot = "team2";
 
     // If WB R1 was a bye, there is no loser
     const match: Match = {
       id: matchId,
       matchNumber: matchCounter++,
       tournamentId: tournament.id,
-      bracketType: 'losers',
+      bracketType: "losers",
       roundNumber: 1,
-      roundName: getRoundName('losers', 1, totalLbRounds),
+      roundName: getRoundName("losers", 1, totalLbRounds),
       team1Id: null,
       team2Id: null,
-      team1Placeholder: `Loser M#${wbLossM1.matchNumber}`,
-      team2Placeholder: `Loser M#${wbLossM2.matchNumber}`,
+      team1Placeholder: `Waiting`,
+      team2Placeholder: `Waiting`,
       team1Score: null,
       team2Score: null,
       winnerId: null,
       loserId: null,
-      status: 'pending',
+      status: "pending",
       nextMatchId: null,
-      nextMatchSlot: 'team1',
+      nextMatchSlot: "team1",
     };
 
     lbMatchesByRound[1].push(match);
@@ -361,29 +368,29 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
       const wbDropMatch = wbMatchesByRound[w][i];
 
       prevLbMatch.nextMatchId = matchId;
-      prevLbMatch.nextMatchSlot = 'team1';
+      prevLbMatch.nextMatchSlot = "team1";
 
       wbDropMatch.loserNextMatchId = matchId;
-      wbDropMatch.loserNextMatchSlot = 'team2';
+      wbDropMatch.loserNextMatchSlot = "team2";
 
       const match: Match = {
         id: matchId,
         matchNumber: matchCounter++,
         tournamentId: tournament.id,
-        bracketType: 'losers',
+        bracketType: "losers",
         roundNumber: lbDropRoundNum,
-        roundName: getRoundName('losers', lbDropRoundNum, totalLbRounds),
+        roundName: getRoundName("losers", lbDropRoundNum, totalLbRounds),
         team1Id: null,
         team2Id: null,
-        team1Placeholder: `Winner M#${prevLbMatch.matchNumber}`,
-        team2Placeholder: `Loser M#${wbDropMatch.matchNumber}`,
+        team1Placeholder: `Waiting`,
+        team2Placeholder: `Waiting`,
         team1Score: null,
         team2Score: null,
         winnerId: null,
         loserId: null,
-        status: 'pending',
+        status: "pending",
         nextMatchId: null,
-        nextMatchSlot: i % 2 === 0 ? 'team1' : 'team2',
+        nextMatchSlot: i % 2 === 0 ? "team1" : "team2",
       };
 
       lbMatchesByRound[lbDropRoundNum].push(match);
@@ -402,28 +409,28 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
         const prevM2 = lbMatchesByRound[lbDropRoundNum][i * 2 + 1];
 
         prevM1.nextMatchId = matchId;
-        prevM1.nextMatchSlot = 'team1';
+        prevM1.nextMatchSlot = "team1";
         prevM2.nextMatchId = matchId;
-        prevM2.nextMatchSlot = 'team2';
+        prevM2.nextMatchSlot = "team2";
 
         const match: Match = {
           id: matchId,
           matchNumber: matchCounter++,
           tournamentId: tournament.id,
-          bracketType: 'losers',
+          bracketType: "losers",
           roundNumber: lbIntRoundNum,
-          roundName: getRoundName('losers', lbIntRoundNum, totalLbRounds),
+          roundName: getRoundName("losers", lbIntRoundNum, totalLbRounds),
           team1Id: null,
           team2Id: null,
-          team1Placeholder: `Winner M#${prevM1.matchNumber}`,
-          team2Placeholder: `Winner M#${prevM2.matchNumber}`,
+          team1Placeholder: `Waiting`,
+          team2Placeholder: `Waiting`,
           team1Score: null,
           team2Score: null,
           winnerId: null,
           loserId: null,
-          status: 'pending',
+          status: "pending",
           nextMatchId: null,
-          nextMatchSlot: 'team1',
+          nextMatchSlot: "team1",
         };
 
         lbMatchesByRound[lbIntRoundNum].push(match);
@@ -436,29 +443,29 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
   const wbFinalMatch = wbMatchesByRound[W][0];
   const lbFinalMatch = lbMatchesByRound[totalLbRounds][0];
 
-  const grandFinalId = 'GF-M1';
+  const grandFinalId = "GF-M1";
   wbFinalMatch.nextMatchId = grandFinalId;
-  wbFinalMatch.nextMatchSlot = 'team1';
+  wbFinalMatch.nextMatchSlot = "team1";
 
   lbFinalMatch.nextMatchId = grandFinalId;
-  lbFinalMatch.nextMatchSlot = 'team2';
+  lbFinalMatch.nextMatchSlot = "team2";
 
   const grandFinalMatch: Match = {
     id: grandFinalId,
     matchNumber: matchCounter++,
     tournamentId: tournament.id,
-    bracketType: 'grand_final',
+    bracketType: "grand_final",
     roundNumber: 1,
-    roundName: 'Grand Final',
+    roundName: "Grand Final",
     team1Id: null,
     team2Id: null,
-    team1Placeholder: `Winner M#${wbFinalMatch.matchNumber} (Winners Bracket)`,
-    team2Placeholder: `Winner M#${lbFinalMatch.matchNumber} (Losers Bracket)`,
+    team1Placeholder: `Waiting`,
+    team2Placeholder: `Waiting`,
     team1Score: null,
     team2Score: null,
     winnerId: null,
     loserId: null,
-    status: 'pending',
+    status: "pending",
     nextMatchId: null,
   };
   matches.push(grandFinalMatch);
@@ -467,7 +474,7 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
     ...tournament,
     matches,
     bracketGenerated: true,
-    status: 'ongoing',
+    status: "ongoing",
     championTeamId: null,
     runnerUpTeamId: null,
     updatedAt: new Date().toISOString(),
@@ -480,18 +487,18 @@ export function generateDoubleElimination(tournament: Tournament): Tournament {
 export function generateTournamentBracket(tournament: Tournament): Tournament {
   const check = canGenerateBracket(tournament);
   if (!check.canGenerate) {
-    throw new Error(check.reason || 'Cannot generate bracket.');
+    throw new Error(check.reason || "Cannot generate bracket.");
   }
 
   // Fresh start: generating (or regenerating) always resets team losses,
   // champion/runner-up and status alongside the rebuilt matches.
   let tournamentToGenerate: Tournament = {
     ...tournament,
-    teams: tournament.teams.map(t => ({ ...t, losses: 0 })),
+    teams: tournament.teams.map((t) => ({ ...t, losses: 0 })),
     championTeamId: null,
     runnerUpTeamId: null,
   };
-  if (tournament.settings.seedingMethod === 'random') {
+  if (tournament.settings.seedingMethod === "random") {
     const shuffledTeams = [...tournament.teams].sort(() => Math.random() - 0.5);
     shuffledTeams.forEach((t, index) => {
       t.seed = index + 1;
@@ -499,7 +506,7 @@ export function generateTournamentBracket(tournament: Tournament): Tournament {
     tournamentToGenerate.teams = shuffledTeams;
   }
 
-  if (tournament.settings.format === 'double_elimination') {
+  if (tournament.settings.format === "double_elimination") {
     return generateDoubleElimination(tournamentToGenerate);
   }
   return generateSingleElimination(tournamentToGenerate);
@@ -510,17 +517,17 @@ export function generateTournamentBracket(tournament: Tournament): Tournament {
  */
 export function recomputeTeamLosses(tournament: Tournament): Tournament {
   const lossCounts: Record<string, number> = {};
-  tournament.teams.forEach(t => {
+  tournament.teams.forEach((t) => {
     lossCounts[t.id] = 0;
   });
 
-  tournament.matches.forEach(m => {
-    if (m.status === 'completed' && m.loserId) {
+  tournament.matches.forEach((m) => {
+    if (m.status === "completed" && m.loserId) {
       lossCounts[m.loserId] = (lossCounts[m.loserId] || 0) + 1;
     }
   });
 
-  const updatedTeams = tournament.teams.map(t => ({
+  const updatedTeams = tournament.teams.map((t) => ({
     ...t,
     losses: lossCounts[t.id] || 0,
   }));
@@ -539,14 +546,14 @@ export function recordMatchResult(
   matchId: string,
   winnerId: string,
   team1Score: number | null,
-  team2Score: number | null
+  team2Score: number | null,
 ): Tournament {
-  const matchIndex = tournament.matches.findIndex(m => m.id === matchId);
-  if (matchIndex === -1) throw new Error('Match not found');
+  const matchIndex = tournament.matches.findIndex((m) => m.id === matchId);
+  if (matchIndex === -1) throw new Error("Match not found");
 
   const match = { ...tournament.matches[matchIndex] };
   if (!match.team1Id || !match.team2Id) {
-    throw new Error('Both teams must be present to record a match result.');
+    throw new Error("Both teams must be present to record a match result.");
   }
 
   const loserId = match.team1Id === winnerId ? match.team2Id : match.team1Id;
@@ -555,10 +562,15 @@ export function recordMatchResult(
   // Validate scores if numerical
   if (team1Score !== null && team2Score !== null) {
     if (team1Score === team2Score) {
-      throw new Error('Scores cannot be tied. A clear winner must be determined.');
+      throw new Error(
+        "Scores cannot be tied. A clear winner must be determined.",
+      );
     }
-    if ((team1Score > team2Score && !isTeam1Winner) || (team2Score > team1Score && isTeam1Winner)) {
-      throw new Error('Scores must be consistent with the selected winner.');
+    if (
+      (team1Score > team2Score && !isTeam1Winner) ||
+      (team2Score > team1Score && isTeam1Winner)
+    ) {
+      throw new Error("Scores must be consistent with the selected winner.");
     }
   }
 
@@ -566,7 +578,7 @@ export function recordMatchResult(
   match.team2Score = team2Score;
   match.winnerId = winnerId;
   match.loserId = loserId;
-  match.status = 'completed';
+  match.status = "completed";
   match.completedAt = new Date().toISOString();
 
   const updatedMatches = [...tournament.matches];
@@ -578,12 +590,14 @@ export function recordMatchResult(
 
   // 1. Advance winner to nextMatchId
   if (match.nextMatchId) {
-    const nextMatchIdx = updatedMatches.findIndex(m => m.id === match.nextMatchId);
+    const nextMatchIdx = updatedMatches.findIndex(
+      (m) => m.id === match.nextMatchId,
+    );
     if (nextMatchIdx !== -1) {
       const nextMatch = { ...updatedMatches[nextMatchIdx] };
 
       // Standard winner advance (a played win clears any BYE-arrival marker)
-      if (match.nextMatchSlot === 'team1') {
+      if (match.nextMatchSlot === "team1") {
         nextMatch.team1Id = winnerId;
         nextMatch.team1Placeholder = undefined;
         nextMatch.team1ByeAdvance = undefined;
@@ -594,26 +608,28 @@ export function recordMatchResult(
       }
 
       if (nextMatch.team1Id && nextMatch.team2Id) {
-        nextMatch.status = 'ready';
+        nextMatch.status = "ready";
       }
       updatedMatches[nextMatchIdx] = nextMatch;
     }
   } else {
     // If no nextMatchId: this is a Final match (single-elim final or
     // double-elim Grand Final). One match decides it — winner is champion.
-    if (match.bracketType === 'single' || match.bracketType === 'grand_final') {
+    if (match.bracketType === "single" || match.bracketType === "grand_final") {
       championId = winnerId;
       runnerUpId = loserId;
-      tournamentStatus = 'completed';
+      tournamentStatus = "completed";
     }
   }
 
   // 2. Advance loser in Double Elimination
   if (match.loserNextMatchId && loserId) {
-    const loserNextMatchIdx = updatedMatches.findIndex(m => m.id === match.loserNextMatchId);
+    const loserNextMatchIdx = updatedMatches.findIndex(
+      (m) => m.id === match.loserNextMatchId,
+    );
     if (loserNextMatchIdx !== -1) {
       const loserNextMatch = { ...updatedMatches[loserNextMatchIdx] };
-      if (match.loserNextMatchSlot === 'team1') {
+      if (match.loserNextMatchSlot === "team1") {
         loserNextMatch.team1Id = loserId;
         loserNextMatch.team1Placeholder = undefined;
         loserNextMatch.team1ByeAdvance = undefined;
@@ -624,7 +640,7 @@ export function recordMatchResult(
       }
 
       if (loserNextMatch.team1Id && loserNextMatch.team2Id) {
-        loserNextMatch.status = 'ready';
+        loserNextMatch.status = "ready";
       }
       updatedMatches[loserNextMatchIdx] = loserNextMatch;
     }
@@ -646,17 +662,20 @@ export function recordMatchResult(
  * Resets a completed or ongoing match back to ready/pending,
  * and clears any downstream matches that relied on this result.
  */
-export function resetMatchResult(tournament: Tournament, matchId: string): Tournament {
-  const matchIndex = tournament.matches.findIndex(m => m.id === matchId);
-  if (matchIndex === -1) throw new Error('Match not found');
+export function resetMatchResult(
+  tournament: Tournament,
+  matchId: string,
+): Tournament {
+  const matchIndex = tournament.matches.findIndex((m) => m.id === matchId);
+  if (matchIndex === -1) throw new Error("Match not found");
 
   const targetMatch = tournament.matches[matchIndex];
   const oldWinnerId = targetMatch.winnerId;
   const oldLoserId = targetMatch.loserId;
 
   // Work on copies so upstream reads stay stable while we clear downstream.
-  const updatedMatches = tournament.matches.map(m => ({ ...m }));
-  const byId = new Map(updatedMatches.map(m => [m.id, m]));
+  const updatedMatches = tournament.matches.map((m) => ({ ...m }));
+  const byId = new Map(updatedMatches.map((m) => [m.id, m]));
 
   // 1. Reset the target match itself (teams stay, result is cleared).
   const target = byId.get(matchId)!;
@@ -665,14 +684,16 @@ export function resetMatchResult(tournament: Tournament, matchId: string): Tourn
   target.winnerId = null;
   target.loserId = null;
   target.completedAt = undefined;
-  target.status = (target.team1Id && target.team2Id ? 'ready' : 'pending') as MatchStatus;
+  target.status = (
+    target.team1Id && target.team2Id ? "ready" : "pending"
+  ) as MatchStatus;
 
   // 2. Walk downstream slot-by-slot. A downstream slot is only cleared when it
   // still holds the exact team that this result chain placed there — matches
   // fed from other branches are left untouched.
   interface ClearTask {
     matchId: string;
-    slot: 'team1' | 'team2';
+    slot: "team1" | "team2";
     expectedTeamId: string;
     feederMatchNumber: number;
     isLoserPath: boolean;
@@ -703,14 +724,12 @@ export function resetMatchResult(tournament: Tournament, matchId: string): Tourn
     const m = byId.get(task.matchId);
     if (!m) continue;
 
-    const current = task.slot === 'team1' ? m.team1Id : m.team2Id;
+    const current = task.slot === "team1" ? m.team1Id : m.team2Id;
     if (current !== task.expectedTeamId) continue; // Fed from another path — leave it.
 
     // Clear only the affected slot and restore its placeholder.
-    const restoredPlaceholder = task.isLoserPath
-      ? `Loser M#${task.feederMatchNumber}`
-      : `Winner of M#${task.feederMatchNumber}`;
-    if (task.slot === 'team1') {
+    const restoredPlaceholder = task.isLoserPath ? `Waiting` : `Waiting`;
+    if (task.slot === "team1") {
       m.team1Id = null;
       m.team1Placeholder = restoredPlaceholder;
       m.team1ByeAdvance = undefined;
@@ -728,7 +747,7 @@ export function resetMatchResult(tournament: Tournament, matchId: string): Tourn
     m.winnerId = null;
     m.loserId = null;
     m.completedAt = undefined;
-    m.status = 'pending';
+    m.status = "pending";
 
     if (m.nextMatchId && m.nextMatchSlot && downstreamWinner) {
       queue.push({
@@ -755,7 +774,7 @@ export function resetMatchResult(tournament: Tournament, matchId: string): Tourn
     matches: updatedMatches,
     championTeamId: null,
     runnerUpTeamId: null,
-    status: 'ongoing',
+    status: "ongoing",
     updatedAt: new Date().toISOString(),
   };
 
